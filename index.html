@@ -163,7 +163,8 @@
         return `<button class="opt" data-i="${i}"><span class="t"><p class="l">${esc(l.label || c.name)}</p>` +
           (l.hint ? `<p class="h">${esc(l.hint)}</p>` : '') + `</span>${credits}</button>`;
       }).join('') +
-      '</div><p class="note">The result is saved as a new version of this image. The previous version is kept.</p>';
+      '</div><p class="note">The result is saved as a new version of this image; the previous version is kept. ' +
+      'A cut-out, or a result with another file type, is saved as a new file next to the original.</p>';
     $('content').querySelectorAll('.opt').forEach((b) => { b.onclick = () => run(channels[Number(b.dataset.i)]); });
   }
 
@@ -172,10 +173,13 @@
     $('content').innerHTML = `<div class="row-status"><span class="spinner"></span><span>${esc(text)}</span></div>`;
   }
 
-  function renderDone(channel, beforeUrl, afterUrl) {
+  function renderDone(channel, beforeUrl, afterUrl, result) {
     hideStatus();
     const label = ((cfg.LABELS || {})[channel.name] || {}).label || channel.name;
-    let html = `<div class="msg ok">Done. “${esc(label)}” is saved as a new version.</div>`;
+    const isNew = result && result.savedAs === 'new';
+    let html = isNew
+      ? `<div class="msg ok">Done. “${esc(label)}” is saved as a new file: <strong>${esc(result.newFilename || '')}</strong></div>`
+      : `<div class="msg ok">Done. “${esc(label)}” is saved as a new version.</div>`;
     if (beforeUrl || afterUrl) {
       html += '<div class="compare">' +
         `<figure>${beforeUrl ? `<img alt="Before" src="${beforeUrl}">` : ''}<figcaption>Before</figcaption></figure>` +
@@ -183,9 +187,11 @@
         '</div>';
       if (!afterUrl) html += '<p class="note">The new preview is still being made. Refresh Assets to see it.</p>';
     }
+    if (isNew && result.newAssetId) html += '<button class="btn-ghost" id="openBtn">Open the new file</button>';
     html += '<button class="btn-ghost" id="againBtn">Optimize again</button>';
     $('content').innerHTML = html;
     $('againBtn').onclick = () => { releaseUrls(); renderOptions(); };
+    if ($('openBtn')) $('openBtn').onclick = () => { client && client.openAssets([result.newAssetId]).catch(() => {}); };
   }
 
   function reflect(asset) {
@@ -233,7 +239,7 @@
       let result = null;
       while (Date.now() < deadline) {
         await sleep(cfg.POLL_INTERVAL_MS || 2500);
-        const s = await backend('/status', { jobId, assetId: id, filename });
+        const s = await backend('/status', { jobId, assetId: id, filename, saveAsNew: (cfg.SAVE_AS_NEW || []).includes(channel.name) });
         if (s.state === 'done') { result = s; break; }
         if (s.state === 'failed') throw new Error(s.error || 'Pixometry could not process the image');
       }
@@ -242,8 +248,8 @@
       // Give Assets a moment to make the new preview, then show before / after.
       const before = await beforeP;
       await sleep(3000);
-      const after = await previewUrl(id);
-      if (current && current.id === id) renderDone(channel, before, after);
+      const after = await previewUrl(result.savedAs === 'new' && result.newAssetId ? result.newAssetId : id);
+      if (current && current.id === id) renderDone(channel, before, after, result);
     } catch (e) {
       if (current && current.id === id) {
         renderOptions();

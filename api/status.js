@@ -1,10 +1,12 @@
 // POST /api/status   body: { jobId, assetId, filename }
 // Checks the Pixometry job. When it is finished, downloads the result and saves it
-// in Assets 10 as a NEW VERSION of the same asset (the previous version is kept).
+// in Assets 10:
+//   - same file type as the original  -> NEW VERSION of the same asset (previous version kept)
+//   - different file type (e.g. PNG cut-out of a JPEG) -> NEW FILE next to the original
 //
 // Returns { state: 'processing' | 'done' | 'failed', ... }
 
-const { guard, readBody, assetsApi, pixApi, extOf, sameType, MIME_EXT } = require('../lib/shared');
+const { env, guard, readBody, assetsApi, pixApi, extOf, sameType, MIME_EXT } = require('../lib/shared');
 
 // Pixometry answers GET /api/v1/jobs/{id} with
 //   { id, filename, submittedAt, results: [ { id, channel, status, error, ... } ] }
@@ -34,6 +36,7 @@ module.exports = async (req, res) => {
   const jobId = String(body.jobId || '').trim();
   const assetId = String(body.assetId || '').trim();
   const filename = String(body.filename || '').trim();
+  const forceNew = body.saveAsNew === true; // channel is configured to always save a new file
   if (!jobId || !assetId) return res.status(400).json({ error: 'jobId and assetId are required' });
 
   try {
@@ -61,12 +64,45 @@ module.exports = async (req, res) => {
     const origExt = extOf(filename);
 
     // A new version must be the same file type as the original. A channel that
-    // changes the type (e.g. JPEG -> PNG cut-out or WebP) is not saved as a version.
-    if (origExt && resultExt && !sameType(origExt, resultExt)) {
+    // changes the type (e.g. JPEG -> PNG cut-out, WebP, PDF) is saved as a NEW FILE
+    // next to the original instead: <name><suffix>.<new type>. The same happens for
+    // channels the panel marks as "always a new file" (cut-outs).
+    if (forceNew || (origExt && resultExt && !sameType(origExt, resultExt))) {
+      // Where does the original live?
+      const info = await assetsApi('/api/asset/' + encodeURIComponent(assetId));
+      if (!info.ok) throw new Error('Could not read the original asset from Assets (HTTP ' + info.status + ')');
+      const asset = await info.json();
+      const md = asset.metadata || {};
+      const origPath = String(md.assetPath || (md.folderPath && (md.filename || filename) ? md.folderPath.replace(/\/+$/, '') + '/' + (md.filename || filename) : ''));
+      if (!origPath) throw new Error('Could not find the folder of the original asset');
+      const suffix = env('NEW_FILE_SUFFIX', '_pixometry');
+      const newPath = origPath.replace(/\.[A-Za-z0-9]+$/, '') + suffix + '.' + (resultExt || origExt || 'jpg');
+
+      // Assets 10 API: POST /api/asset creates a placeholder and returns an uploadUrl;
+      // the file is then uploaded to that URL with a PUT.
+      const created = await assetsApi('/api/asset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetPath: newPath, autoRename: true, metadata: {}, metadataToReturn: ['assetPath', 'filename'] }),
+      });
+      const ctext = await created.text();
+      if (!created.ok) throw new Error('Creating the new file in Assets failed (HTTP ' + created.status + '): ' + ctext.slice(0, 300));
+      let c = {};
+      try { c = JSON.parse(ctext); } catch (_) { throw new Error('Assets create response is not JSON'); }
+      if (!c.uploadUrl) throw new Error('Assets gave no upload address for the new file');
+
+      const put = await fetch(c.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: Buffer.from(bytes),
+      });
+      if (!put.ok) throw new Error('Uploading the new file to Assets failed (HTTP ' + put.status + ')');
+
+      const savedPath = (c.metadata && c.metadata.assetPath) || newPath;
       return res.status(200).json({
-        state: 'failed',
-        error: 'The result is a .' + resultExt + ' file and the original is a .' + origExt +
-          ' file. It was not saved, because a new version must keep the same file type.',
+        state: 'done', savedAs: 'new', newAssetId: c.id,
+        newFilename: (c.metadata && c.metadata.filename) || savedPath.split('/').pop(),
+        sizeBytes: bytes.byteLength,
       });
     }
 

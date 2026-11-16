@@ -2,14 +2,20 @@
 window.PLUGIN_CONFIG = {
   // Which Pixometry channels to show as buttons, by exact channel name.
   // Empty list = show every channel in the Pixometry account.
-  CHANNELS: ['Image Enhancement', 'Enhancement+upscaling', 'Generative Enhancement'],
+  CHANNELS: ['Image Enhancement', 'Enhancement+background removal', 'Enhancement+upscaling', 'Generative Enhancement'],
 
   // Friendly button labels and one-line explanations (optional, per channel name).
   LABELS: {
     'Image Enhancement': { label: 'Enhance', hint: 'Better light, colour and sharpness' },
+    'Enhancement+background removal': { label: 'Remove background', hint: 'Enhance and cut out the subject' },
     'Enhancement+upscaling': { label: 'Enhance + upscale', hint: 'Enhance and enlarge small images' },
     'Generative Enhancement': { label: 'Generative enhance', hint: 'Cleans up noisy, low-quality images' },
   },
+
+  // Channels whose result is always saved as a new file next to the original, never
+  // as a new version (a cut-out is a different picture, not a better original).
+  // Other channels: new version, or a new file when the file type changes.
+  SAVE_AS_NEW: ['Enhancement+background removal'],
 
   // Only offer the buttons for these file types (lower case, no dot).
   FILE_TYPES: ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'webp'],

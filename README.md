@@ -54,11 +54,10 @@ verkeerd secret → 401, onbekend kanaal → 400, insturen, wachten, nieuwe vers
 ander bestandstype → niet opgeslagen. **Nog niet getest tegen de echte systemen.**
 
 ## Te verifiëren in de echte omgeving
-1. **Antwoord van Pixometry op een opdracht.** De API-pagina beschrijft de velden van het
-   antwoord niet. De code zoekt het opdrachtnummer in `id` / `jobId` en de status in
-   `status` / `state`, en herkent woorden als *completed*, *done*, *failed*, *error*.
-   Blijft het paneel hangen op "Pixometry is working on it", dan klopt dit niet: kijk in
-   de Vercel-logs of vraag John naar de exacte velden.
+1. **Antwoord van Pixometry op een opdracht.** Opgelost op 16 nov 2026: de status staat
+   in `results[0].status` (waarde `completed`), niet bovenaan in het antwoord. De eerste
+   versie keek op de verkeerde plek en bleef daardoor hangen. Hoe een mislukte opdracht
+   eruitziet (`failed`? `error`?) is nog niet gezien; de code herkent beide.
 2. **Nieuwe versie met een API-sleutel.** Mag de API-sleutel `POST /api/asset/{id}/original`
    aanroepen, en is de vorige versie daarna terug te vinden in de versiegeschiedenis?
 3. **Bestandsnaam van het resultaat.** De code leest het type uit de download
