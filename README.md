@@ -1,1 +1,84 @@
-# pixometry
+# Pixometry — Assets 10 panel-plugin
+
+Prototype voor de webinar met Pixometry (3 dec 2026). Selecteer een beeld in Assets 10,
+kies in het paneel een bewerking (bv. *Enhance*). Het origineel gaat naar Pixometry en
+het resultaat komt terug als **nieuwe versie** van hetzelfde beeld. De vorige versie
+blijft bewaard.
+
+Zelfde opzet als de andere plugins in deze map: statisch paneel (geen build-stap) plus
+een klein tussenstuk op Vercel dat de sleutels geheim houdt.
+SDK: `@woodwing/a10-client-sdk@1.0.4`.
+
+## Hoe het werkt
+1. Paneel vraagt het tussenstuk welke Pixometry-kanalen er zijn en toont ze als knoppen.
+2. Klik op een knop → `api/process`: haalt het origineel op uit Assets 10 en stuurt het
+   naar het gekozen Pixometry-kanaal. Geeft een opdrachtnummer terug.
+3. Paneel vraagt elke 2,5 seconde via `api/status` of Pixometry klaar is.
+4. Klaar → `api/status` haalt het resultaat op en zet het in Assets 10 als nieuwe versie.
+5. Paneel toont voor/na.
+
+## Bestanden
+- `index.html` — het paneel. `?demo=1` draait met voorbeelddata, zonder Assets of Pixometry.
+- `config.js` — welke kanalen als knop, knopteksten, bestandstypen.
+- `api/channels.js` — lijst met kanalen.
+- `api/process.js` — origineel ophalen en insturen.
+- `api/status.js` — status opvragen, resultaat terugzetten als nieuwe versie.
+- `lib/shared.js` — inloggen bij Assets, aanroepen van Pixometry.
+- `vercel.json` — geeft de functies 60 seconden de tijd.
+
+## Inrichten
+1. **Pixometry API-sleutel:** app.pixometry.com → API Keys → *New Key*. Wordt één keer getoond.
+2. **Assets API-sleutel:** Management Console → API.
+3. **GitHub-repo → Vercel** (preset *Other*, geen build).
+4. **Vercel env-vars:**
+   - `ASSETS_API_BASE` — regio-endpoint, bv. `https://api-eu-west-1.swivle.com`
+   - `ASSETS_API_KEY`
+   - `PIXOMETRY_API_KEY`
+   - optioneel `PLUGIN_SECRET` (zelfde waarde in `config.js`), `ALLOWED_CHANNELS`,
+     `PIXOMETRY_API_BASE` (standaard `https://app.pixometry.com`)
+5. **Test het tussenstuk:** open `https://<vercel-url>/api/channels` → lijst met kanalen.
+6. **Management Console → Plug-ins → Panel plug-ins → `+`:** naam `Pixometry`, URL de
+   Vercel-URL, icoon (nog toe te voegen: `icon.png`, 20×20), Enable, rechten per usergroup.
+
+## Bronnen
+- Pixometry REST API (API-pagina in de app): `POST /api/v1/process` (velden `file`,
+  `channel`), `GET /api/v1/jobs/{id}`, `GET /api/v1/jobs/{id}/download`,
+  `GET /api/v1/channels`. Sleutel in de header `X-Api-Key`.
+- Assets 10 API (api.swivle.com): `GET /api/asset/{id}/original` (download) en
+  `POST /api/asset/{id}/original` met `file` + `createVersion` ("Create a version for an
+  asset using multi-part POST").
+
+## Getest
+Alleen tegen een nagebootste Assets- en Pixometry-API (16 nov 2026): kanalen ophalen,
+verkeerd secret → 401, onbekend kanaal → 400, insturen, wachten, nieuwe versie opslaan,
+ander bestandstype → niet opgeslagen. **Nog niet getest tegen de echte systemen.**
+
+## Te verifiëren in de echte omgeving
+1. **Antwoord van Pixometry op een opdracht.** De API-pagina beschrijft de velden van het
+   antwoord niet. De code zoekt het opdrachtnummer in `id` / `jobId` en de status in
+   `status` / `state`, en herkent woorden als *completed*, *done*, *failed*, *error*.
+   Blijft het paneel hangen op "Pixometry is working on it", dan klopt dit niet: kijk in
+   de Vercel-logs of vraag John naar de exacte velden.
+2. **Nieuwe versie met een API-sleutel.** Mag de API-sleutel `POST /api/asset/{id}/original`
+   aanroepen, en is de vorige versie daarna terug te vinden in de versiegeschiedenis?
+3. **Bestandsnaam van het resultaat.** De code leest het type uit de download
+   (`Content-Disposition` / `Content-Type`). Geeft Pixometry dat niet mee, dan wordt het
+   type niet gecontroleerd.
+4. **Preview na de nieuwe versie.** Het paneel wacht 3 seconden en haalt dan de nieuwe
+   preview op. Is die nog niet klaar, dan staat bij "After" nog het oude beeld of niets.
+5. **Grote bestanden.** Het tussenstuk houdt het hele bestand in het geheugen en heeft
+   60 seconden. Test met een groot origineel (bv. 50 MB TIFF).
+
+## Bekende beperkingen
+- **Ander bestandstype wordt niet opgeslagen.** Een kanaal dat van een JPEG een PNG maakt
+  (uitknippen) of WebP, geeft een melding in plaats van een nieuwe versie. Daarom staat
+  *Enhancement+background removal* niet in `config.js`. Volgende stap voor uitknippen:
+  resultaat opslaan als nieuw bestand naast het origineel.
+- **Geen herkomst vastgelegd.** In de metadata staat niet dat de versie door Pixometry is
+  gemaakt (zie punt 9 in `sdk-verbeterpunten.md`).
+- **Het tussenstuk weet niet wie de gebruiker is.** Het werkt met één API-sleutel en kan
+  dus elk beeld vervangen waar die sleutel bij mag, ongeacht de rechten van de gebruiker
+  in het paneel. `PLUGIN_SECRET` houdt alleen toevallige bezoekers van de URL tegen; de
+  waarde is in de browser leesbaar. Prima voor een demo, niet voor productie.
+- **Eén beeld tegelijk.** Bij meerdere geselecteerde beelden pakt het paneel het eerste.
+- **Elke klik kost Pixometry-credits** (1 of 2 per beeld, staat op de knop).

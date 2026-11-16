@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pixometry</title>
+<style>
+  :root {
+    --bg:#fff; --soft:#f6f7f9; --line:#e8eaed; --text:#1a1d21; --muted:#6b7280;
+    --dim:#9aa1ab; --accent:#0396e0; --accent-50:#e6f4fc; --green:#0f9d58; --red:#d23f31;
+    --radius:12px;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; }
+  .wrap { display:flex; flex-direction:column; height:100vh; }
+  .head { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line); }
+  .head .badge { width:30px; height:30px; border-radius:8px; background:var(--accent-50); color:var(--accent);
+    display:flex; align-items:center; justify-content:center; flex:none; }
+  .head .badge svg { width:17px; height:17px; }
+  .head h1 { font-size:14px; font-weight:600; margin:0; }
+  .head p { font-size:11.5px; color:var(--dim); margin:1px 0 0; }
+  .body { padding:14px 16px; overflow-y:auto; flex:1; }
+
+  .asset { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .asset .thumb { width:40px; height:40px; border-radius:8px; object-fit:cover; background:var(--soft);
+    border:1px solid var(--line); flex:none; }
+  .asset .name { font-size:13px; font-weight:600; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .asset .sub { font-size:11.5px; color:var(--muted); margin:1px 0 0; }
+
+  .options { display:flex; flex-direction:column; gap:8px; }
+  .opt { display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:#fff;
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; cursor:pointer; font-family:inherit;
+    transition:background 120ms,border-color 120ms; }
+  .opt:hover { background:var(--accent-50); border-color:var(--accent); }
+  .opt[disabled] { opacity:.5; cursor:default; background:#fff; border-color:var(--line); }
+  .opt .t { flex:1; min-width:0; }
+  .opt .l { font-size:13px; font-weight:600; margin:0; }
+  .opt .h { font-size:11.5px; color:var(--muted); margin:2px 0 0; }
+  .opt .c { flex:none; font-size:10.5px; font-weight:600; color:var(--muted); background:var(--soft);
+    border-radius:999px; padding:3px 8px; white-space:nowrap; }
+
+  .note { font-size:11px; color:var(--dim); margin:10px 2px 0; line-height:1.45; }
+  .msg { font-size:12.5px; color:var(--muted); background:var(--soft); border:1px solid var(--line);
+    padding:11px 14px; border-radius:var(--radius); line-height:1.45; text-align:center; margin-top:6px; }
+  .msg.err { background:#fdecea; border-color:#f5c6c0; color:#8a2b22; text-align:left; }
+  .msg.ok { background:#e7f6ee; border-color:#bfe5cf; color:#0b6b3c; }
+  .row-status { display:flex; align-items:center; gap:8px; justify-content:center; font-size:12.5px;
+    color:var(--muted); padding:14px 0; }
+  .spinner { width:14px; height:14px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--accent);
+    animation:spin .8s linear infinite; flex:none; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .compare { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+  .compare figure { margin:0; }
+  .compare img { width:100%; aspect-ratio:1/1; object-fit:contain; background:var(--soft);
+    border:1px solid var(--line); border-radius:8px; display:block; }
+  .compare figcaption { font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--muted); margin-top:5px; text-align:center; }
+  .btn-ghost { display:block; width:100%; margin-top:12px; background:transparent; color:var(--text);
+    border:1px solid var(--line); border-radius:9px; padding:9px 14px; font-size:13px; font-weight:600;
+    cursor:pointer; font-family:inherit; }
+  .btn-ghost:hover { background:var(--soft); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <span class="badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/></svg>
+    </span>
+    <div>
+      <h1>Pixometry</h1>
+      <p>Optimize this image automatically</p>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="asset" id="assetRow" style="display:none;">
+      <img class="thumb" id="thumb" alt="" />
+      <div style="min-width:0">
+        <p class="name" id="assetName">—</p>
+        <p class="sub" id="assetSub"></p>
+      </div>
+    </div>
+    <div id="content"></div>
+    <div class="msg" id="status">Connecting to Assets…</div>
+  </div>
+</div>
+
+<script src="./config.js"></script>
+<script type="module">
+  const cfg = window.PLUGIN_CONFIG || {};
+  const DEMO = new URLSearchParams(location.search).get('demo') === '1';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const errMsg = (e) => { try { return (e && (e.message || e.code)) || (typeof e === 'object' ? JSON.stringify(e) : String(e)); } catch (_) { return String(e); } };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  if (cfg.BRAND_COLOR) document.documentElement.style.setProperty('--accent', cfg.BRAND_COLOR);
+
+  let client = null;        // Assets 10 SDK client
+  let current = null;       // selected asset
+  let channels = null;      // channels from the backend
+  let busyId = null;        // asset id that is being processed
+  let objectUrls = [];      // blob URLs to release
+
+  const setStatus = (html, cls) => { const s = $('status'); s.style.display = 'block'; s.className = 'msg' + (cls ? ' ' + cls : ''); s.innerHTML = html; };
+  const hideStatus = () => { $('status').style.display = 'none'; };
+  const releaseUrls = () => { objectUrls.forEach((u) => URL.revokeObjectURL(u)); objectUrls = []; };
+
+  function fmtBytes(b) { b = Number(b); if (!b || isNaN(b)) return ''; if (b < 1048576) return (b / 1024).toFixed(0) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
+  const filenameOf = (a) => (a && a.metadata && (a.metadata.filename || a.metadata.name)) || '';
+  const extOf = (name) => { const m = /\.([A-Za-z0-9]+)$/.exec(String(name || '')); return m ? m[1].toLowerCase() : ''; };
+
+  // ---------- backend ----------
+  async function backend(path, payload) {
+    const headers = {};
+    if (cfg.PLUGIN_SECRET) headers['x-plugin-secret'] = cfg.PLUGIN_SECRET;
+    const init = { method: payload ? 'POST' : 'GET', headers };
+    if (payload) { headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(payload); }
+    const r = await fetch((cfg.API_BASE || '/api') + path, init);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    return data;
+  }
+
+  async function loadChannels() {
+    if (DEMO) return [
+      { name: 'Image Enhancement', credits: 1 },
+      { name: 'Enhancement+upscaling', credits: 2 },
+      { name: 'Generative Enhancement', credits: 2 },
+    ];
+    const { channels: list } = await backend('/channels');
+    const wanted = cfg.CHANNELS || [];
+    if (!wanted.length) return list;
+    // Keep the order from config.js.
+    return wanted.map((n) => list.find((c) => c.name === n)).filter(Boolean);
+  }
+
+  // ---------- rendering ----------
+  function showAsset(asset) {
+    if (!asset) { $('assetRow').style.display = 'none'; return; }
+    const md = asset.metadata || {};
+    $('assetRow').style.display = 'flex';
+    $('assetName').textContent = filenameOf(asset) || asset.id || 'Asset';
+    $('assetSub').textContent = [extOf(filenameOf(asset)).toUpperCase(), fmtBytes(md.fileSize)].filter(Boolean).join(' · ');
+    const thumb = $('thumb');
+    if (asset.thumbnailUrl) { thumb.src = asset.thumbnailUrl; thumb.style.display = 'block'; thumb.onerror = () => { thumb.style.display = 'none'; }; }
+    else thumb.style.display = 'none';
+  }
+
+  function renderOptions() {
+    hideStatus();
+    if (!channels || !channels.length) { $('content').innerHTML = ''; setStatus('No Pixometry channels available. Check CHANNELS in config.js.', 'err'); return; }
+    const labels = cfg.LABELS || {};
+    $('content').innerHTML =
+      '<div class="options">' +
+      channels.map((c, i) => {
+        const l = labels[c.name] || {};
+        const credits = c.credits ? `<span class="c">${esc(c.credits)} credit${c.credits === 1 ? '' : 's'}</span>` : '';
+        return `<button class="opt" data-i="${i}"><span class="t"><p class="l">${esc(l.label || c.name)}</p>` +
+          (l.hint ? `<p class="h">${esc(l.hint)}</p>` : '') + `</span>${credits}</button>`;
+      }).join('') +
+      '</div><p class="note">The result is saved as a new version of this image. The previous version is kept.</p>';
+    $('content').querySelectorAll('.opt').forEach((b) => { b.onclick = () => run(channels[Number(b.dataset.i)]); });
+  }
+
+  function renderBusy(text) {
+    hideStatus();
+    $('content').innerHTML = `<div class="row-status"><span class="spinner"></span><span>${esc(text)}</span></div>`;
+  }
+
+  function renderDone(channel, beforeUrl, afterUrl) {
+    hideStatus();
+    const label = ((cfg.LABELS || {})[channel.name] || {}).label || channel.name;
+    let html = `<div class="msg ok">Done. “${esc(label)}” is saved as a new version.</div>`;
+    if (beforeUrl || afterUrl) {
+      html += '<div class="compare">' +
+        `<figure>${beforeUrl ? `<img alt="Before" src="${beforeUrl}">` : ''}<figcaption>Before</figcaption></figure>` +
+        `<figure>${afterUrl ? `<img alt="After" src="${afterUrl}">` : ''}<figcaption>After</figcaption></figure>` +
+        '</div>';
+      if (!afterUrl) html += '<p class="note">The new preview is still being made. Refresh Assets to see it.</p>';
+    }
+    html += '<button class="btn-ghost" id="againBtn">Optimize again</button>';
+    $('content').innerHTML = html;
+    $('againBtn').onclick = () => { releaseUrls(); renderOptions(); };
+  }
+
+  function reflect(asset) {
+    current = asset;
+    releaseUrls();
+    showAsset(asset);
+    if (!asset) { $('content').innerHTML = ''; setStatus('Select an image to optimize.'); return; }
+    const types = cfg.FILE_TYPES || [];
+    const ext = extOf(filenameOf(asset));
+    if (types.length && ext && !types.includes(ext)) {
+      $('content').innerHTML = ''; setStatus('This file type (.' + esc(ext) + ') cannot be optimized.'); return;
+    }
+    renderOptions();
+  }
+
+  // ---------- the actual work ----------
+  async function previewUrl(id) {
+    try {
+      const blob = await client.getAssetBytes(id, 'preview');
+      const u = URL.createObjectURL(blob); objectUrls.push(u); return u;
+    } catch (_) { return null; }
+  }
+
+  async function run(channel) {
+    if (!current || busyId) return;
+    const asset = current;
+    const id = asset.id;
+    const filename = filenameOf(asset);
+    busyId = id;
+    try {
+      if (DEMO) {
+        renderBusy('Sending the original to Pixometry…'); await sleep(1200);
+        renderBusy('Pixometry is working on it…'); await sleep(1800);
+        renderBusy('Saving the new version…'); await sleep(900);
+        renderDone(channel, asset.thumbnailUrl, asset.thumbnailUrl);
+        return;
+      }
+
+      renderBusy('Sending the original to Pixometry…');
+      const beforeP = previewUrl(id); // capture the "before" preview while we wait
+      const { jobId } = await backend('/process', { assetId: id, filename, channel: channel.name });
+
+      renderBusy('Pixometry is working on it…');
+      const deadline = Date.now() + (cfg.POLL_TIMEOUT_MS || 180000);
+      let result = null;
+      while (Date.now() < deadline) {
+        await sleep(cfg.POLL_INTERVAL_MS || 2500);
+        const s = await backend('/status', { jobId, assetId: id, filename });
+        if (s.state === 'done') { result = s; break; }
+        if (s.state === 'failed') throw new Error(s.error || 'Pixometry could not process the image');
+      }
+      if (!result) throw new Error('Pixometry did not finish in time. Check the Results page in Pixometry.');
+
+      // Give Assets a moment to make the new preview, then show before / after.
+      const before = await beforeP;
+      await sleep(3000);
+      const after = await previewUrl(id);
+      if (current && current.id === id) renderDone(channel, before, after);
+    } catch (e) {
+      if (current && current.id === id) {
+        renderOptions();
+        setStatus('<strong>That did not work.</strong><br>' + esc(errMsg(e)), 'err');
+      }
+    } finally {
+      busyId = null;
+    }
+  }
+
+  // ---------- start ----------
+  (async () => {
+    if (DEMO) {
+      channels = await loadChannels();
+      const px = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#cfd8e3"/><circle cx="100" cy="85" r="38" fill="#8fa3ba"/><rect x="45" y="135" width="110" height="65" rx="30" fill="#8fa3ba"/></svg>');
+      reflect({ id: 'demo', metadata: { filename: 'portrait.jpg', fileSize: 2400000 }, thumbnailUrl: px });
+      return;
+    }
+    try {
+      const { Assets10Client } = await import('https://unpkg.com/@woodwing/a10-client-sdk@1.0.4/dist/index.mjs');
+      client = await Assets10Client.bootstrap({ handshakeTimeoutMs: 5000 });
+    } catch (err) {
+      setStatus('Could not connect to Assets (' + esc(errMsg(err)) + ').', 'err'); return;
+    }
+    try {
+      channels = await loadChannels();
+    } catch (err) {
+      setStatus('<strong>Could not reach Pixometry.</strong><br>' + esc(errMsg(err)), 'err'); return;
+    }
+    const update = () => {
+      const sel = (client.getSelection() || [])[0] || null;
+      if (busyId && sel && sel.id === busyId) return;   // keep showing progress
+      if (current && sel && sel.id === current.id && !busyId && $('againBtn')) return; // keep the result on screen
+      reflect(sel);
+    };
+    update();
+    client.onSelectionUpdate(() => update());
+  })();
+</script>
+</body>
+</html>
