@@ -2,8 +2,12 @@
 
 Prototype voor de webinar met Pixometry (3 dec 2026). Selecteer een beeld in Assets 10,
 kies in het paneel een bewerking (bv. *Enhance*). Het origineel gaat naar Pixometry en
-het resultaat komt terug als **nieuwe versie** van hetzelfde beeld. De vorige versie
-blijft bewaard.
+het resultaat komt terug in Assets 10:
+- **zelfde bestandstype** → nieuwe versie van hetzelfde beeld, de vorige versie blijft bewaard;
+- **ander bestandstype** (bv. JPEG → PNG, WebP, PDF) → nieuw bestand naast het origineel,
+  met `_pixometry` achter de naam;
+- **uitknippen** (kanalen in `SAVE_AS_NEW` in `config.js`) → altijd een nieuw bestand,
+  ook als het type gelijk blijft. Een uitsnede is een ander beeld, geen beter origineel.
 
 Zelfde opzet als de andere plugins in deze map: statisch paneel (geen build-stap) plus
 een klein tussenstuk op Vercel dat de sleutels geheim houdt.
@@ -14,7 +18,8 @@ SDK: `@woodwing/a10-client-sdk@1.0.4`.
 2. Klik op een knop → `api/process`: haalt het origineel op uit Assets 10 en stuurt het
    naar het gekozen Pixometry-kanaal. Geeft een opdrachtnummer terug.
 3. Paneel vraagt elke 2,5 seconde via `api/status` of Pixometry klaar is.
-4. Klaar → `api/status` haalt het resultaat op en zet het in Assets 10 als nieuwe versie.
+4. Klaar → `api/status` haalt het resultaat op en zet het in Assets 10 als nieuwe versie
+   of als nieuw bestand (zie hierboven).
 5. Paneel toont voor/na.
 
 ## Bestanden
@@ -35,7 +40,8 @@ SDK: `@woodwing/a10-client-sdk@1.0.4`.
    - `ASSETS_API_KEY`
    - `PIXOMETRY_API_KEY`
    - optioneel `PLUGIN_SECRET` (zelfde waarde in `config.js`), `ALLOWED_CHANNELS`,
-     `PIXOMETRY_API_BASE` (standaard `https://app.pixometry.com`)
+     `PIXOMETRY_API_BASE` (standaard `https://app.pixometry.com`), `NEW_FILE_SUFFIX`
+     (standaard `_pixometry`)
 5. **Test het tussenstuk:** open `https://<vercel-url>/api/channels` → lijst met kanalen.
 6. **Management Console → Plug-ins → Panel plug-ins → `+`:** naam `Pixometry`, URL de
    Vercel-URL, icoon (nog toe te voegen: `icon.png`, 20×20), Enable, rechten per usergroup.
@@ -46,12 +52,15 @@ SDK: `@woodwing/a10-client-sdk@1.0.4`.
   `GET /api/v1/channels`. Sleutel in de header `X-Api-Key`.
 - Assets 10 API (api.swivle.com): `GET /api/asset/{id}/original` (download) en
   `POST /api/asset/{id}/original` met `file` + `createVersion` ("Create a version for an
-  asset using multi-part POST").
+  asset using multi-part POST"). Nieuw bestand: `POST /api/asset` (geeft een `uploadUrl`
+  terug) en daarna het bestand met `PUT` naar die `uploadUrl`.
 
 ## Getest
 Alleen tegen een nagebootste Assets- en Pixometry-API (16 nov 2026): kanalen ophalen,
 verkeerd secret → 401, onbekend kanaal → 400, insturen, wachten, nieuwe versie opslaan,
-ander bestandstype → niet opgeslagen. **Nog niet getest tegen de echte systemen.**
+ander bestandstype of uitknippen → nieuw bestand naast het origineel.
+In de echte omgeving werkt *Enhance* als nieuwe versie (16 nov 2026, PNG-testbeeld).
+**Opslaan als nieuw bestand is nog niet getest tegen de echte systemen.**
 
 ## Te verifiëren in de echte omgeving
 1. **Antwoord van Pixometry op een opdracht.** Opgelost op 16 nov 2026: de status staat
@@ -68,11 +77,25 @@ ander bestandstype → niet opgeslagen. **Nog niet getest tegen de echte systeme
 5. **Grote bestanden.** Het tussenstuk houdt het hele bestand in het geheugen en heeft
    60 seconden. Test met een groot origineel (bv. 50 MB TIFF).
 
+## Extra knoppen
+`EXTRA_BUTTONS` in `config.js` maakt een knop van een bestaand kanaal plus vaste
+instellingen voor die ene opdracht. De eerste is *Ready for web*: kanaal *Image
+Enhancement*, langste zijde maximaal 2000 pixels, JPEG op kwaliteit 0,92. Die
+instellingen zijn het voorbeeld van de API-pagina van Pixometry. Het resultaat wordt
+altijd een nieuw bestand naast het origineel, met `_web` achter de naam.
+
+## Bestandstype van het resultaat
+Het kanaal *Enhancement+background removal* staat in Pixometry ingesteld op een TIFF met
+lagen. Dat gaf bij de eerste test een bestand van 167 MB. Het paneel vraagt daarom per
+opdracht om een PNG (`OVERRIDES` in `config.js`, veld `output.fileFormat`). De waarde
+`PNG` is niet uit de documentatie overgenomen maar afgeleid: de API-pagina noemt alleen
+`JPEG`, en in de kanalen staan `TIFF` en `ORIGINAL`. Komt er toch een TIFF terug, zet dan
+het bestandstype in het kanaal zelf in Pixometry om, of vraag John naar de juiste waarde.
+
 ## Bekende beperkingen
-- **Ander bestandstype wordt niet opgeslagen.** Een kanaal dat van een JPEG een PNG maakt
-  (uitknippen) of WebP, geeft een melding in plaats van een nieuwe versie. Daarom staat
-  *Enhancement+background removal* niet in `config.js`. Volgende stap voor uitknippen:
-  resultaat opslaan als nieuw bestand naast het origineel.
+- **Nieuw bestand heeft geen metadata van het origineel.** Het krijgt alleen de naam
+  `<naam>_pixometry.<type>` in dezelfde map. Er is geen koppeling tussen origineel en
+  nieuw bestand, behalve de naam.
 - **Geen herkomst vastgelegd.** In de metadata staat niet dat de versie door Pixometry is
   gemaakt (zie punt 9 in `sdk-verbeterpunten.md`).
 - **Het tussenstuk weet niet wie de gebruiker is.** Het werkt met één API-sleutel en kan

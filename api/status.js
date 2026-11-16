@@ -1,4 +1,4 @@
-// POST /api/status   body: { jobId, assetId, filename }
+// POST /api/status   body: { jobId, assetId, filename, saveAsNew?, suffix? }
 // Checks the Pixometry job. When it is finished, downloads the result and saves it
 // in Assets 10:
 //   - same file type as the original  -> NEW VERSION of the same asset (previous version kept)
@@ -75,7 +75,9 @@ module.exports = async (req, res) => {
       const md = asset.metadata || {};
       const origPath = String(md.assetPath || (md.folderPath && (md.filename || filename) ? md.folderPath.replace(/\/+$/, '') + '/' + (md.filename || filename) : ''));
       if (!origPath) throw new Error('Could not find the folder of the original asset');
-      const suffix = env('NEW_FILE_SUFFIX', '_pixometry');
+      // The panel may ask for its own suffix (e.g. _web); only simple characters are accepted.
+      const asked = String(body.suffix || '');
+      const suffix = /^[A-Za-z0-9_-]{1,20}$/.test(asked) ? asked : env('NEW_FILE_SUFFIX', '_pixometry');
       const newPath = origPath.replace(/\.[A-Za-z0-9]+$/, '') + suffix + '.' + (resultExt || origExt || 'jpg');
 
       // Assets 10 API: POST /api/asset creates a placeholder and returns an uploadUrl;

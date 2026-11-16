@@ -1,4 +1,4 @@
-// POST /api/process   body: { assetId, filename, channel }
+// POST /api/process   body: { assetId, filename, channel, overrides? }
 // Downloads the original from Assets 10 and submits it to a Pixometry channel.
 // Returns { jobId }. The panel then polls /api/status until the job is done.
 
@@ -30,6 +30,10 @@ module.exports = async (req, res) => {
     const form = new FormData();
     form.append('file', new Blob([bytes], { type }), filename);
     form.append('channel', channel);
+    // Optional per-job settings (Pixometry "overrides"), e.g. another output file type.
+    if (body.overrides && typeof body.overrides === 'object' && Object.keys(body.overrides).length) {
+      form.append('overrides', JSON.stringify(body.overrides));
+    }
     const up = await pixApi('/api/v1/process', { method: 'POST', body: form });
     const text = await up.text();
     if (!up.ok) throw new Error('Pixometry refused the image (HTTP ' + up.status + '): ' + text.slice(0, 300));

@@ -131,12 +131,18 @@
       { name: 'Image Enhancement', credits: 1 },
       { name: 'Enhancement+upscaling', credits: 2 },
       { name: 'Generative Enhancement', credits: 2 },
+      ...(cfg.EXTRA_BUTTONS || []).map((x) => ({ name: x.channel, credits: 1, label: x.label, hint: x.hint })),
     ];
     const { channels: list } = await backend('/channels');
     const wanted = cfg.CHANNELS || [];
-    if (!wanted.length) return list;
     // Keep the order from config.js.
-    return wanted.map((n) => list.find((c) => c.name === n)).filter(Boolean);
+    const buttons = wanted.length ? wanted.map((n) => list.find((c) => c.name === n)).filter(Boolean) : list.slice();
+    // Extra buttons: a channel plus fixed settings (see EXTRA_BUTTONS in config.js).
+    for (const x of cfg.EXTRA_BUTTONS || []) {
+      const base = list.find((c) => c.name === x.channel);
+      if (base) buttons.push({ ...base, label: x.label, hint: x.hint, overrides: x.overrides, saveAsNew: x.saveAsNew, suffix: x.suffix });
+    }
+    return buttons;
   }
 
   // ---------- rendering ----------
@@ -158,7 +164,7 @@
     $('content').innerHTML =
       '<div class="options">' +
       channels.map((c, i) => {
-        const l = labels[c.name] || {};
+        const l = c.label ? { label: c.label, hint: c.hint } : (labels[c.name] || {});
         const credits = c.credits ? `<span class="c">${esc(c.credits)} credit${c.credits === 1 ? '' : 's'}</span>` : '';
         return `<button class="opt" data-i="${i}"><span class="t"><p class="l">${esc(l.label || c.name)}</p>` +
           (l.hint ? `<p class="h">${esc(l.hint)}</p>` : '') + `</span>${credits}</button>`;
@@ -175,7 +181,7 @@
 
   function renderDone(channel, beforeUrl, afterUrl, result) {
     hideStatus();
-    const label = ((cfg.LABELS || {})[channel.name] || {}).label || channel.name;
+    const label = channel.label || ((cfg.LABELS || {})[channel.name] || {}).label || channel.name;
     const isNew = result && result.savedAs === 'new';
     let html = isNew
       ? `<div class="msg ok">Done. “${esc(label)}” is saved as a new file: <strong>${esc(result.newFilename || '')}</strong></div>`
@@ -232,14 +238,14 @@
 
       renderBusy('Sending the original to Pixometry…');
       const beforeP = previewUrl(id); // capture the "before" preview while we wait
-      const { jobId } = await backend('/process', { assetId: id, filename, channel: channel.name });
+      const { jobId } = await backend('/process', { assetId: id, filename, channel: channel.name, overrides: channel.overrides || (cfg.OVERRIDES || {})[channel.name] || undefined });
 
       renderBusy('Pixometry is working on it…');
       const deadline = Date.now() + (cfg.POLL_TIMEOUT_MS || 180000);
       let result = null;
       while (Date.now() < deadline) {
         await sleep(cfg.POLL_INTERVAL_MS || 2500);
-        const s = await backend('/status', { jobId, assetId: id, filename, saveAsNew: (cfg.SAVE_AS_NEW || []).includes(channel.name) });
+        const s = await backend('/status', { jobId, assetId: id, filename, saveAsNew: channel.saveAsNew === true || (!channel.label && (cfg.SAVE_AS_NEW || []).includes(channel.name)), suffix: channel.suffix || undefined });
         if (s.state === 'done') { result = s; break; }
         if (s.state === 'failed') throw new Error(s.error || 'Pixometry could not process the image');
       }

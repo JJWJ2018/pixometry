@@ -17,6 +17,31 @@ window.PLUGIN_CONFIG = {
   // Other channels: new version, or a new file when the file type changes.
   SAVE_AS_NEW: ['Enhancement+background removal'],
 
+  // Per-channel settings sent along with each job (Pixometry calls these "overrides").
+  // They change one job without touching the channel in Pixometry.
+  // The background-removal channel is set up in Pixometry to deliver a layered TIFF
+  // (very large). Ask for a PNG with a transparent background instead.
+  OVERRIDES: {
+    'Enhancement+background removal': { output: { fileFormat: 'PNG' } },
+  },
+
+  // Extra buttons: an existing channel plus fixed settings for that one job.
+  // The settings below are the example from the Pixometry API page.
+  // saveAsNew: always a new file next to the original; suffix: added to its name.
+  EXTRA_BUTTONS: [
+    {
+      label: 'Ready for web',
+      hint: 'Enhance, max 2000 px, JPEG',
+      channel: 'Image Enhancement',
+      overrides: {
+        size: { resampleActive: true, longestSizePixelsActive: true, longestSizePixels: 2000 },
+        output: { fileFormat: 'JPEG', jpegQuality: 0.92 },
+      },
+      saveAsNew: true,
+      suffix: '_web',
+    },
+  ],
+
   // Only offer the buttons for these file types (lower case, no dot).
   FILE_TYPES: ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'webp'],
 
