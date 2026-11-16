@@ -6,12 +6,17 @@
 
 const { guard, readBody, assetsApi, pixApi, extOf, sameType, MIME_EXT } = require('../lib/shared');
 
-// The job response shape is not documented on the API page, so read it defensively.
+// Pixometry answers GET /api/v1/jobs/{id} with
+//   { id, filename, submittedAt, results: [ { id, channel, status, error, ... } ] }
+// (seen 16 Nov 2026: status "completed"). The status sits in results[0], not at the
+// top level. Other shapes are still accepted, in case the API changes.
 function jobState(j) {
-  const raw = String(j.status ?? j.state ?? j.jobStatus ?? (j.job && (j.job.status ?? j.job.state)) ?? '').toLowerCase();
-  if (/fail|error|cancel|reject|bad/.test(raw)) return { state: 'failed', raw };
-  if (/complete|done|finish|success|ready|processed/.test(raw) || j.completed === true || j.done === true) return { state: 'done', raw };
-  return { state: 'processing', raw };
+  const first = Array.isArray(j.results) ? (j.results[0] || {}) : (j.results && typeof j.results === 'object' ? j.results : {});
+  const raw = String(first.status ?? first.state ?? j.status ?? j.state ?? j.jobStatus ?? '').toLowerCase();
+  const error = first.error || j.error || j.message || '';
+  if (/fail|error|cancel|reject|bad/.test(raw)) return { state: 'failed', raw, error };
+  if (/complete|done|finish|success|ready|processed/.test(raw)) return { state: 'done', raw, error };
+  return { state: 'processing', raw, error };
 }
 
 function filenameFromDisposition(h) {
@@ -39,10 +44,10 @@ module.exports = async (req, res) => {
     let j = {};
     try { j = JSON.parse(text); } catch (_) { throw new Error('Pixometry status is not JSON: ' + text.slice(0, 200)); }
 
-    const { state, raw } = jobState(j);
+    const { state, raw, error } = jobState(j);
     if (state === 'processing') return res.status(200).json({ state, pixometryStatus: raw });
     if (state === 'failed') {
-      const why = j.error || j.message || j.errorMessage || raw;
+      const why = error || raw;
       return res.status(200).json({ state, error: 'Pixometry could not process the image: ' + why });
     }
 
