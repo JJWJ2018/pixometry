@@ -41,6 +41,15 @@
   .opt .c { flex:none; font-size:10.5px; font-weight:600; color:var(--muted); background:var(--soft);
     border-radius:999px; padding:3px 8px; white-space:nowrap; }
 
+  .pick-title { font-size:13px; font-weight:600; margin:0 2px; }
+  .formats { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .fmt { display:flex; flex-direction:column; align-items:center; gap:4px; background:#fff; border:1px solid var(--line);
+    border-radius:10px; padding:10px 6px; cursor:pointer; font-family:inherit; transition:background 120ms,border-color 120ms; }
+  .fmt:hover { background:var(--accent-50); border-color:var(--accent); }
+  .fmt .shape { width:38px; height:38px; display:flex; align-items:center; justify-content:center; }
+  .fmt .shape i { display:block; border:2px solid var(--accent); border-radius:3px; background:var(--accent-50); }
+  .fmt .fl { font-size:12.5px; font-weight:600; }
+  .fmt .fd { font-size:10.5px; color:var(--muted); }
   .note { font-size:11px; color:var(--dim); margin:10px 2px 0; line-height:1.45; }
   .msg { font-size:12.5px; color:var(--muted); background:var(--soft); border:1px solid var(--line);
     padding:11px 14px; border-radius:var(--radius); line-height:1.45; text-align:center; margin-top:6px; }
@@ -131,7 +140,7 @@
       { name: 'Image Enhancement', credits: 1 },
       { name: 'Enhancement+upscaling', credits: 2 },
       { name: 'Generative Enhancement', credits: 2 },
-      ...(cfg.EXTRA_BUTTONS || []).map((x) => ({ name: x.channel, credits: 1, label: x.label, hint: x.hint })),
+      ...(cfg.EXTRA_BUTTONS || []).map((x) => ({ name: x.channel, credits: x.formats ? 2 : 1, label: x.label, hint: x.hint, formats: x.formats })),
     ];
     const { channels: list } = await backend('/channels');
     const wanted = cfg.CHANNELS || [];
@@ -140,7 +149,7 @@
     // Extra buttons: a channel plus fixed settings (see EXTRA_BUTTONS in config.js).
     for (const x of cfg.EXTRA_BUTTONS || []) {
       const base = list.find((c) => c.name === x.channel);
-      if (base) buttons.push({ ...base, label: x.label, hint: x.hint, overrides: x.overrides, saveAsNew: x.saveAsNew, suffix: x.suffix });
+      if (base) buttons.push({ ...base, label: x.label, hint: x.hint, overrides: x.overrides, saveAsNew: x.saveAsNew, suffix: x.suffix, formats: x.formats });
     }
     return buttons;
   }
@@ -171,7 +180,34 @@
       }).join('') +
       '</div><p class="note">The result is saved as a new version of this image; the previous version is kept. ' +
       'A cut-out, or a result with another file type, is saved as a new file next to the original.</p>';
-    $('content').querySelectorAll('.opt').forEach((b) => { b.onclick = () => run(channels[Number(b.dataset.i)]); });
+    $('content').querySelectorAll('.opt').forEach((b) => {
+      b.onclick = () => {
+        const c = channels[Number(b.dataset.i)];
+        if (c.formats && c.formats.length) renderFormats(c); else run(c);
+      };
+    });
+  }
+
+  // A button with several output formats (e.g. Smart crop): pick the frame first.
+  function renderFormats(c) {
+    hideStatus();
+    $('content').innerHTML =
+      `<p class="pick-title">${esc(c.label || c.name)}</p><p class="note" style="margin:2px 2px 10px">Choose the format of the new image.</p>` +
+      '<div class="formats">' +
+      c.formats.map((f, i) => {
+        const w = Number(f.width), h = Number(f.height), m = Math.max(w, h) || 1;
+        return `<button class="fmt" data-i="${i}"><span class="shape"><i style="width:${Math.round(34 * w / m)}px;height:${Math.round(34 * h / m)}px"></i></span>` +
+          `<span class="fl">${esc(f.label)}</span><span class="fd">${esc(w)} × ${esc(h)}</span></button>`;
+      }).join('') +
+      '</div><button class="btn-ghost" id="backBtn">Back</button>';
+    $('content').querySelectorAll('.fmt').forEach((b) => {
+      b.onclick = () => {
+        const f = c.formats[Number(b.dataset.i)];
+        const size = { ...((c.overrides || {}).size || {}), fillBoxActive: true, fillBoxWidth: Number(f.width), fillBoxHeight: Number(f.height) };
+        run({ ...c, label: (c.label || c.name) + ' – ' + f.label, overrides: { ...(c.overrides || {}), size }, suffix: f.suffix || c.suffix });
+      };
+    });
+    $('backBtn').onclick = () => renderOptions();
   }
 
   function renderBusy(text) {

@@ -84,6 +84,33 @@ Enhancement*, langste zijde maximaal 2000 pixels, JPEG op kwaliteit 0,92. Die
 instellingen zijn het voorbeeld van de API-pagina van Pixometry. Het resultaat wordt
 altijd een nieuw bestand naast het origineel, met `_web` achter de naam.
 
+Toegevoegd op 17 nov 2026, op twee kanalen die Jouke zelf in Pixometry heeft gemaakt:
+- *Colorize* → kanaal **Inkleuren** (instelling `workFlow.colorizeBW`). Nieuw bestand
+  met `_color` achter de naam.
+- *Smart crop & fill* → kanaal **Uitvullen & slim croppen**. Eén knop; daarna kies je
+  het formaat (4:5, 1:1, 9:16 of 16:9). Het paneel stuurt dat formaat per opdracht mee
+  als kader (`size.fillBoxWidth` / `fillBoxHeight`); het kanaal zelf staat op 500 × 500.
+  Nieuw bestand met `_portrait`, `_square`, `_story` of `_landscape` achter de naam.
+
+Wat het kanaal doet, volgens de teksten in de kanaal-editor van Pixometry (tabblad Size,
+"Fill box (crop or extend)"), met de waarden van 17 nov 2026:
+- **Frame the subject:** het onderwerp (product, persoon, groep) wordt gevonden en vult
+  minstens 85% van het kader. Het kader mag daarbij buiten de foto vallen.
+- **Frame portraits by eyes and head:** is het één gezicht van minstens 25% van de
+  hoogte van het onderwerp, dan komen de ogen op 33% vanaf de bovenkant, krijgt het
+  hoofd 55% van de kaderhoogte en blijft er 4% lucht om het hoofd. Haar en de zijkanten
+  van het hoofd worden nooit afgesneden.
+- **Als het kader meer beeld nodig heeft dan de foto heeft:** "Extend with generated
+  pixels (AI)", 1 extra credit per aangevuld beeld, maximaal 35% van het kader per kant.
+  **Is er meer nodig, dan mislukt het beeld met een melding.** De eigen pixels worden
+  nooit vervangen; het onderwerp kan wel worden doorgetrokken (schouders, kleding).
+  Het bijmaken gebeurt door een externe aanbieder (Bria).
+- Content Credentials kunnen het bijgemaakte deel vastleggen; in dit kanaal staat dat uit
+  (`output.contentCredentialsActive: false`).
+
+**Nog niet getest.** Onzeker: of Pixometry een deels meegestuurde `size` samenvoegt met
+de kanaalinstellingen (het voorbeeld op de API-pagina doet het zo).
+
 ## Bestandstype van het resultaat
 Het kanaal *Enhancement+background removal* staat in Pixometry ingesteld op een TIFF met
 lagen. Dat gaf bij de eerste test een bestand van 167 MB. Het paneel vraagt daarom per

@@ -40,6 +40,31 @@ window.PLUGIN_CONFIG = {
       saveAsNew: true,
       suffix: '_web',
     },
+    {
+      // Channel "Inkleuren" in Pixometry (setting: colorize black-and-white).
+      label: 'Colorize',
+      hint: 'Turns a black-and-white image into colour',
+      channel: 'Inkleuren',
+      saveAsNew: true,
+      suffix: '_color',
+    },
+    {
+      // Channel "Uitvullen & slim croppen" in Pixometry. One action that does both:
+      // it finds the subject (or the face, for a portrait), places the frame around it,
+      // and where the frame needs more image than the photo has, generates the rest.
+      // The frame size comes from the format the user picks (sent per job; the channel
+      // itself is set to 500 x 500).
+      label: 'Smart crop & fill',
+      hint: 'Reframes around the subject, fills in what is missing',
+      channel: 'Uitvullen & slim croppen',
+      saveAsNew: true,
+      formats: [
+        { label: 'Portrait 4:5', width: 1080, height: 1350, suffix: '_portrait' },
+        { label: 'Square 1:1', width: 1080, height: 1080, suffix: '_square' },
+        { label: 'Story 9:16', width: 1080, height: 1920, suffix: '_story' },
+        { label: 'Landscape 16:9', width: 1920, height: 1080, suffix: '_landscape' },
+      ],
+    },
   ],
 
   // Only offer the buttons for these file types (lower case, no dot).
