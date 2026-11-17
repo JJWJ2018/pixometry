@@ -65,6 +65,8 @@
   .compare figure { margin:0; }
   .compare img { width:100%; aspect-ratio:1/1; object-fit:contain; background:var(--soft);
     border:1px solid var(--line); border-radius:8px; display:block; }
+  .compare .ph { width:100%; aspect-ratio:1/1; background:var(--soft); border:1px solid var(--line);
+    border-radius:8px; display:flex; align-items:center; justify-content:center; }
   .compare figcaption { font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
     color:var(--muted); margin-top:5px; text-align:center; }
   .btn-ghost { display:block; width:100%; margin-top:12px; background:transparent; color:var(--text);
@@ -224,10 +226,10 @@
       : `<div class="msg ok">Done. “${esc(label)}” is saved as a new version.</div>`;
     if (beforeUrl || afterUrl) {
       html += '<div class="compare">' +
-        `<figure>${beforeUrl ? `<img alt="Before" src="${beforeUrl}">` : ''}<figcaption>Before</figcaption></figure>` +
-        `<figure>${afterUrl ? `<img alt="After" src="${afterUrl}">` : ''}<figcaption>After</figcaption></figure>` +
+        `<figure>${beforeUrl ? `<img alt="Before" src="${beforeUrl}">` : '<div class="ph"></div>'}<figcaption>Before</figcaption></figure>` +
+        `<figure id="afterFig">${afterUrl ? `<img alt="After" src="${afterUrl}">` : '<div class="ph"><span class="spinner"></span></div>'}<figcaption>After</figcaption></figure>` +
         '</div>';
-      if (!afterUrl) html += '<p class="note">The new preview is still being made. Refresh Assets to see it.</p>';
+      if (!afterUrl) html += '<p class="note" id="afterNote">Assets is making the preview of the result…</p>';
     }
     if (isNew && result.newAssetId) html += '<button class="btn-ghost" id="openBtn">Open the new file</button>';
     html += '<button class="btn-ghost" id="againBtn">Optimize again</button>';
@@ -289,9 +291,27 @@
 
       // Give Assets a moment to make the new preview, then show before / after.
       const before = await beforeP;
+      const afterId = result.savedAs === 'new' && result.newAssetId ? result.newAssetId : id;
       await sleep(3000);
-      const after = await previewUrl(result.savedAs === 'new' && result.newAssetId ? result.newAssetId : id);
-      if (current && current.id === id) renderDone(channel, before, after, result);
+      let after = await previewUrl(afterId);
+      if (!(current && current.id === id)) return;
+      renderDone(channel, before, after, result);
+      busyId = null; // the job is finished; the buttons may be used again
+      // A new file needs a little longer before Assets has its preview: keep trying
+      // for about 45 seconds and drop the picture in as soon as it is there.
+      for (let i = 0; !after && i < 15; i++) {
+        await sleep(3000);
+        if (!(current && current.id === id) || !$('afterFig')) return;
+        after = await previewUrl(afterId);
+        if (after && $('afterFig')) {
+          $('afterFig').innerHTML = `<img alt="After" src="${after}"><figcaption>After</figcaption>`;
+          if ($('afterNote')) $('afterNote').remove();
+        }
+      }
+      if (!after && $('afterNote')) {
+        $('afterNote').textContent = 'The preview is not ready yet. Open the new file or refresh Assets to see it.';
+        const ph = $('afterFig') && $('afterFig').querySelector('.spinner'); if (ph) ph.remove();
+      }
     } catch (e) {
       if (current && current.id === id) {
         renderOptions();
